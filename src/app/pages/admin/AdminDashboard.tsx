@@ -114,9 +114,13 @@ export function AdminDashboard() {
                         <Pencil size={16} />
                       </Link>
                       <button
-                        onClick={() => {
-                          toggleStatus(v.id);
-                          flash(status === "Pausado" ? "Veículo reativado." : "Veículo pausado. Ele não aparece mais no site público.");
+                        onClick={async () => {
+                          await toggleStatus(v.id);
+                          flash(
+                            status === "Pausado"
+                              ? "Veículo reativado."
+                              : "Veículo pausado. Ele não aparece mais no site público."
+                          );
                         }}
                         className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
                         title={status === "Pausado" ? "Reativar" : "Pausar"}
@@ -162,8 +166,8 @@ export function AdminDashboard() {
                 Cancelar
               </button>
               <button
-                onClick={() => {
-                  removeVehicle(confirmId);
+                onClick={async () => {
+                  await removeVehicle(confirmId);
                   setConfirmId(null);
                   flash("Veículo removido definitivamente.");
                 }}

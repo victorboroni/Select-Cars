@@ -93,7 +93,7 @@ export function AdminVehicleForm() {
     setNewHighlight("");
   };
 
-  const save = (status: VehicleStatus) => {
+  const save = async (status: VehicleStatus) => {
     const missing: string[] = [];
     if (!form.brand.trim()) missing.push("brand");
     if (!form.model.trim()) missing.push("model");
@@ -101,7 +101,9 @@ export function AdminVehicleForm() {
       setErrors(missing);
       return;
     }
-    const finalId = form.id || `${slugify(`${form.brand}-${form.model}`)}-${Date.now().toString(36)}`;
+    const finalId =
+      form.id ||
+      `${slugify(`${form.brand}-${form.model}`)}-${Date.now().toString(36)}`;
     const payload: Vehicle = {
       ...form,
       id: finalId,
@@ -109,8 +111,12 @@ export function AdminVehicleForm() {
       price: priceOnRequest ? null : Number(form.price) || 0,
       image: form.image || "",
     };
-    saveVehicle(payload);
-    navigate("/admin/painel");
+    try {
+      await saveVehicle(payload);
+      navigate("/admin/painel");
+    } catch {
+      setErrors(["save"]);
+    }
   };
 
   const invalid = (name: string) => errors.includes(name);
@@ -128,7 +134,9 @@ export function AdminVehicleForm() {
 
       {errors.length > 0 && (
         <div className="rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-error" style={{ fontSize: "14px" }}>
-          Verifique os campos obrigatórios destacados.
+          {errors.includes("save")
+            ? "Não foi possível salvar no banco. Tente novamente."
+            : "Verifique os campos obrigatórios destacados."}
         </div>
       )}
 

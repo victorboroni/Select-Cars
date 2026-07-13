@@ -1,13 +1,14 @@
-// SelectCars — acervo (mock/exemplo). Conteúdo dinâmico no Painel do Lojista.
-import porsche from "../../imports/Image__Porsche_911_GT3_RS_.png";
-import porscheHero from "../../imports/Image__Porsche_911_GT3_RS_em_destaque_.png";
-import ferrari from "../../imports/Image__Ferrari_296_GTB_.png";
-import lamborghini from "../../imports/Image__Lamborghini_Hurac_n_Tecnica_.png";
-import mercedes from "../../imports/Image__Mercedes-AMG_GT_63_S_.png";
-import aston from "../../imports/Image__Aston_Martin_DB12_.png";
-import bentley from "../../imports/Image__Bentley_Continental_GT_Speed_.png";
+// SelectCars — acervo de referência (seed local / fallback).
+// Os mesmos dados foram persistidos no Supabase (vehicles + storage).
+const STORAGE_BASE =
+  "https://krpzgngzdqtokybgkwcz.supabase.co/storage/v1/object/public/vehicle-images";
 
-export type Badge = "RARO" | "ÚLTIMA UNIDADE" | "NOVO" | "RESERVADO" | "EDIÇÃO LIMITADA";
+export type Badge =
+  | "RARO"
+  | "ÚLTIMA UNIDADE"
+  | "NOVO"
+  | "RESERVADO"
+  | "EDIÇÃO LIMITADA";
 export type Category =
   | "Esportivos"
   | "Clássicos"
@@ -67,8 +68,8 @@ export const vehicles: Vehicle[] = [
     available: true,
     description:
       "Aero kit Weissach, bancos em fibra de carbono e procedência impecável de primeiro dono.",
-    image: porsche,
-    heroImage: porscheHero,
+    image: `${STORAGE_BASE}/porsche-911-gt3-rs/cover.png`,
+    heroImage: `${STORAGE_BASE}/porsche-911-gt3-rs/hero.png`,
     specs: {
       engine: "4.0L Boxer 6 aspirado · 525 cv · 0–100 km/h em 3.2s",
       topSpeed: "296 km/h",
@@ -78,7 +79,7 @@ export const vehicles: Vehicle[] = [
     highlights: [
       "Aero kit Weissach completo",
       "Teto em magnésio",
-      "Rodas forjadas 20\"",
+      'Rodas forjadas 20"',
       "Bancos em fibra de carbono",
     ],
   },
@@ -98,7 +99,7 @@ export const vehicles: Vehicle[] = [
     available: true,
     description:
       "V6 híbrido turbinado, 830 cv combinados. Histórico completo e revisão oficial.",
-    image: ferrari,
+    image: `${STORAGE_BASE}/ferrari-296-gtb/cover.png`,
     specs: {
       engine: "3.0L V6 turbo híbrido · 830 cv combinados",
       topSpeed: "330 km/h",
@@ -128,7 +129,7 @@ export const vehicles: Vehicle[] = [
     available: true,
     description:
       "V10 aspirado, dinâmica de pista, configuração específica para a unidade.",
-    image: lamborghini,
+    image: `${STORAGE_BASE}/lamborghini-huracan-tecnica/cover.png`,
     specs: {
       engine: "5.2L V10 aspirado · 640 cv",
       topSpeed: "325 km/h",
@@ -157,7 +158,7 @@ export const vehicles: Vehicle[] = [
     available: true,
     description:
       "Quatro portas com motor 4.0 V8 biturbo. Acabamento Designo e laudo independente.",
-    image: mercedes,
+    image: `${STORAGE_BASE}/mercedes-amg-gt-63-s/cover.png`,
     specs: {
       engine: "4.0L V8 biturbo · 639 cv",
       topSpeed: "315 km/h",
@@ -187,7 +188,7 @@ export const vehicles: Vehicle[] = [
     available: false,
     description:
       "GT inglês com 680 cv. Couro Bridge of Weir e detalhes em alumínio escovado.",
-    image: aston,
+    image: `${STORAGE_BASE}/aston-martin-db12/cover.png`,
     specs: {
       engine: "4.0L V8 biturbo · 680 cv",
       topSpeed: "325 km/h",
@@ -216,7 +217,7 @@ export const vehicles: Vehicle[] = [
     available: true,
     description:
       "GT de 12 cilindros, interior em couro Mulliner, presença para qualquer agenda.",
-    image: bentley,
+    image: `${STORAGE_BASE}/bentley-continental-gt-speed/cover.png`,
     specs: {
       engine: "6.0L W12 biturbo · 659 cv",
       topSpeed: "335 km/h",
@@ -225,7 +226,7 @@ export const vehicles: Vehicle[] = [
     },
     highlights: [
       "Interior em couro Mulliner",
-      "Rodas 22\" polidas",
+      'Rodas 22" polidas',
       "Suspensão pneumática",
       "Acabamento Orange Flame único",
     ],
@@ -262,4 +263,8 @@ export const badgeOptions: Badge[] = [
   "EDIÇÃO LIMITADA",
   "RESERVADO",
 ];
-export const statusOptions: VehicleStatus[] = ["Publicado", "Pausado", "Rascunho"];
+export const statusOptions: VehicleStatus[] = [
+  "Publicado",
+  "Pausado",
+  "Rascunho",
+];

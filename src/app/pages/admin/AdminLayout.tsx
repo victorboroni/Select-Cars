@@ -3,8 +3,16 @@ import { LogOut } from "lucide-react";
 import { useVehicles } from "../../store/VehiclesContext";
 
 export function AdminLayout() {
-  const { isAuthed, logout } = useVehicles();
+  const { isAuthed, isAuthReady, logout } = useVehicles();
   const navigate = useNavigate();
+
+  if (!isAuthReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50 text-neutral-600" style={{ fontSize: "14px" }}>
+        Carregando sessão...
+      </div>
+    );
+  }
 
   if (!isAuthed) return <Navigate to="/admin" replace />;
 
@@ -29,8 +37,8 @@ export function AdminLayout() {
               Ver site
             </Link>
             <button
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 navigate("/admin");
               }}
               className="flex items-center gap-2 rounded-full border border-neutral-200 px-4 py-2 text-neutral-900 transition-colors hover:border-neutral-900"
