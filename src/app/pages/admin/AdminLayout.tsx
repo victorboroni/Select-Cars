@@ -3,7 +3,7 @@ import { LogOut } from "lucide-react";
 import { useVehicles } from "../../store/VehiclesContext";
 
 export function AdminLayout() {
-  const { isAuthed, isAuthReady, logout } = useVehicles();
+  const { isAuthed, isStaff, isAuthReady, logout } = useVehicles();
   const navigate = useNavigate();
 
   if (!isAuthReady) {
@@ -14,7 +14,7 @@ export function AdminLayout() {
     );
   }
 
-  if (!isAuthed) return <Navigate to="/admin" replace />;
+  if (!isAuthed || !isStaff) return <Navigate to="/admin" replace />;
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50">

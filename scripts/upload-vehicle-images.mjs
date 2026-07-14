@@ -36,10 +36,12 @@ const supabaseAnonKey =
   fileEnv.VITE_SUPABASE_ANON_KEY ??
   fileEnv.VITE_SUPABASE_PUBLISHABLE_KEY ??
   "";
+const loginEmail =
+  process.env.SUPABASE_UPLOAD_EMAIL ?? fileEnv.SUPABASE_UPLOAD_EMAIL ?? "";
+const loginPassword =
+  process.env.SUPABASE_UPLOAD_PASSWORD ?? fileEnv.SUPABASE_UPLOAD_PASSWORD ?? "";
 
 const BUCKET = "vehicle-images";
-const LOGIN_EMAIL = "selectcars@selectcars.com";
-const LOGIN_PASSWORD = "selectcars123";
 
 const uploads = [
   {
@@ -93,12 +95,19 @@ async function main() {
     process.exit(1);
   }
 
+  if (!loginEmail || !loginPassword) {
+    console.error(
+      "FAIL: Missing SUPABASE_UPLOAD_EMAIL or SUPABASE_UPLOAD_PASSWORD (use .env, never commit secrets)"
+    );
+    process.exit(1);
+  }
+
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
   const { data: signInData, error: signInError } =
     await supabase.auth.signInWithPassword({
-      email: LOGIN_EMAIL,
-      password: LOGIN_PASSWORD,
+      email: loginEmail,
+      password: loginPassword,
     });
 
   if (signInError) {

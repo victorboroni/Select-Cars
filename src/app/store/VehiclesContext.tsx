@@ -17,6 +17,8 @@ import {
 
 const AUTH_KEY = "selectcars.auth.v1";
 
+type UserRole = "ADMIN" | "LOJISTA" | "SEM_ACESSO";
+
 function seeded(): Vehicle[] {
   return seed.map((v, i) => ({
     ...v,
@@ -25,6 +27,16 @@ function seeded(): Vehicle[] {
       v.createdAt ??
       new Date(Date.now() - (seed.length - i) * 86400000 * 3).toISOString(),
   }));
+}
+
+function isStaffRole(role: string | null | undefined) {
+  return role === "ADMIN" || role === "LOJISTA";
+}
+
+interface AuthResult {
+  error?: string;
+  needsEmailConfirmation?: boolean;
+  notStaff?: boolean;
 }
 
 interface VehiclesContextValue {
@@ -37,18 +49,85 @@ interface VehiclesContextValue {
   removeVehicle: (id: string) => Promise<void>;
   toggleStatus: (id: string) => Promise<void>;
   isAuthed: boolean;
-  login: (email: string, password: string) => Promise<{ error?: string }>;
+  isStaff: boolean;
+  userRole: UserRole | null;
+  needsAdminBootstrap: boolean | null;
+  refreshBootstrapState: () => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  register: (
+    email: string,
+    password: string,
+    name?: string
+  ) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshVehicles: () => Promise<void>;
 }
 
 const VehiclesContext = createContext<VehiclesContextValue | null>(null);
 
+async function fetchCurrentUserRole(): Promise<UserRole | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error || !data?.role) return null;
+  return data.role as UserRole;
+}
+
 export function VehiclesProvider({ children }: { children: React.ReactNode }) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthed, setIsAuthed] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [needsAdminBootstrap, setNeedsAdminBootstrap] = useState<boolean | null>(
+    null
+  );
+
+  const refreshBootstrapState = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setNeedsAdminBootstrap(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc("needs_admin_bootstrap");
+      if (error) {
+        setNeedsAdminBootstrap(null);
+        return;
+      }
+      setNeedsAdminBootstrap(Boolean(data));
+    } catch {
+      setNeedsAdminBootstrap(null);
+    }
+  }, []);
+
+  const syncAuthState = useCallback(async (hasSession: boolean) => {
+    if (!hasSession) {
+      setIsAuthed(false);
+      setIsStaff(false);
+      setUserRole(null);
+      sessionStorage.removeItem(AUTH_KEY);
+      return;
+    }
+
+    const role = await fetchCurrentUserRole();
+    const staff = isStaffRole(role);
+    setUserRole(role);
+    setIsStaff(staff);
+    setIsAuthed(staff);
+
+    if (staff) sessionStorage.setItem(AUTH_KEY, "1");
+    else sessionStorage.removeItem(AUTH_KEY);
+  }, []);
 
   const refreshVehicles = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -74,10 +153,12 @@ export function VehiclesProvider({ children }: { children: React.ReactNode }) {
         if (isSupabaseConfigured) {
           const { data } = await supabase.auth.getSession();
           if (!active) return;
-          setIsAuthed(Boolean(data.session));
-          if (data.session) sessionStorage.setItem(AUTH_KEY, "1");
+          await syncAuthState(Boolean(data.session));
+          await refreshBootstrapState();
         } else {
           setIsAuthed(sessionStorage.getItem(AUTH_KEY) === "1");
+          setIsStaff(sessionStorage.getItem(AUTH_KEY) === "1");
+          setNeedsAdminBootstrap(false);
         }
         await refreshVehicles();
       } finally {
@@ -90,23 +171,23 @@ export function VehiclesProvider({ children }: { children: React.ReactNode }) {
 
     bootstrap();
 
-    if (!isSupabaseConfigured) return () => {
-      active = false;
-    };
+    if (!isSupabaseConfigured) {
+      return () => {
+        active = false;
+      };
+    }
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthed(Boolean(session));
-      if (session) sessionStorage.setItem(AUTH_KEY, "1");
-      else sessionStorage.removeItem(AUTH_KEY);
+      void syncAuthState(Boolean(session));
     });
 
     return () => {
       active = false;
       subscription.unsubscribe();
     };
-  }, [refreshVehicles]);
+  }, [refreshBootstrapState, refreshVehicles, syncAuthState]);
 
   const saveVehicle = useCallback(
     async (v: Vehicle) => {
@@ -175,25 +256,89 @@ export function VehiclesProvider({ children }: { children: React.ReactNode }) {
     [isAuthed, vehicles]
   );
 
-  const login = useCallback(async (email: string, password: string) => {
-    if (!isSupabaseConfigured) {
-      sessionStorage.setItem(AUTH_KEY, "1");
-      setIsAuthed(true);
+  const login = useCallback(
+    async (email: string, password: string): Promise<AuthResult> => {
+      if (!isSupabaseConfigured) {
+        sessionStorage.setItem(AUTH_KEY, "1");
+        setIsAuthed(true);
+        setIsStaff(true);
+        return {};
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) return { error: error.message };
+
+      const role = await fetchCurrentUserRole();
+      if (!isStaffRole(role)) {
+        await supabase.auth.signOut();
+        await syncAuthState(false);
+        return {
+          notStaff: true,
+          error: "Conta sem permissão para o painel administrativo.",
+        };
+      }
+
+      await syncAuthState(true);
+      await refreshVehicles();
+      await refreshBootstrapState();
       return {};
-    }
+    },
+    [refreshBootstrapState, refreshVehicles, syncAuthState]
+  );
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+  const register = useCallback(
+    async (
+      email: string,
+      password: string,
+      name?: string
+    ): Promise<AuthResult> => {
+      if (!isSupabaseConfigured) {
+        return { error: "Supabase não configurado neste ambiente." };
+      }
 
-    if (error) return { error: error.message };
+      const trimmedEmail = email.trim();
+      const trimmedName = name?.trim();
 
-    sessionStorage.setItem(AUTH_KEY, "1");
-    setIsAuthed(true);
-    await refreshVehicles();
-    return {};
-  }, [refreshVehicles]);
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: {
+          data: trimmedName ? { name: trimmedName } : undefined,
+        },
+      });
+
+      if (error) return { error: error.message };
+
+      if (!data.session) {
+        await refreshBootstrapState();
+        return {
+          needsEmailConfirmation: true,
+        };
+      }
+
+      const role = await fetchCurrentUserRole();
+      if (!isStaffRole(role)) {
+        await supabase.auth.signOut();
+        await syncAuthState(false);
+        await refreshBootstrapState();
+        return {
+          notStaff: true,
+          error:
+            "Conta criada, mas sem acesso ao painel. Peça a um administrador para liberar o perfil.",
+        };
+      }
+
+      await syncAuthState(true);
+      await refreshVehicles();
+      await refreshBootstrapState();
+      return {};
+    },
+    [refreshBootstrapState, refreshVehicles, syncAuthState]
+  );
 
   const logout = useCallback(async () => {
     if (isSupabaseConfigured) {
@@ -201,6 +346,8 @@ export function VehiclesProvider({ children }: { children: React.ReactNode }) {
     }
     sessionStorage.removeItem(AUTH_KEY);
     setIsAuthed(false);
+    setIsStaff(false);
+    setUserRole(null);
   }, []);
 
   const value = useMemo<VehiclesContextValue>(
@@ -216,7 +363,12 @@ export function VehiclesProvider({ children }: { children: React.ReactNode }) {
       removeVehicle,
       toggleStatus,
       isAuthed,
+      isStaff,
+      userRole,
+      needsAdminBootstrap,
+      refreshBootstrapState,
       login,
+      register,
       logout,
       refreshVehicles,
     }),
@@ -228,7 +380,12 @@ export function VehiclesProvider({ children }: { children: React.ReactNode }) {
       removeVehicle,
       toggleStatus,
       isAuthed,
+      isStaff,
+      userRole,
+      needsAdminBootstrap,
+      refreshBootstrapState,
       login,
+      register,
       logout,
       refreshVehicles,
     ]
